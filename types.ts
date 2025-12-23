@@ -17,3 +17,9 @@ export interface PaperData {
   body: string;
   references: string[];
 }
+
+export interface AiConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}

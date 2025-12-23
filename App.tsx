@@ -7,21 +7,30 @@ import WeChatModern from './components/WeChatModern';
 import WeChatDiary from './components/WeChatDiary';
 import { parseMarkdownToPaper } from './services/paperEngine';
 import { exportToDocx, exportToImage, exportToPdf, copyToWeChat } from './services/exportService';
-import { TemplateId, DigitalStyleId } from './types';
+import { enhanceTextWithAi } from './services/aiService';
+import { TemplateId, DigitalStyleId, AiConfig } from './types';
 
 const App: React.FC = () => {
   const [template, setTemplate] = useState<TemplateId>('academic');
   const [digitalStyle, setDigitalStyle] = useState<DigitalStyleId>('retro');
   
-  // New: Digital Header/Footer Controls
+  // Digital Header/Footer Controls
   const [digitalHeader, setDigitalHeader] = useState('ARTICLE');
   const [digitalSubHeader, setDigitalSubHeader] = useState('Classical Aesthetic Collection');
-  const [digitalTitleOverride, setDigitalTitleOverride] = useState(''); // New: Manual Title Control
+  const [digitalTitleOverride, setDigitalTitleOverride] = useState('');
   const [digitalFooter, setDigitalFooter] = useState('End of Transmission • 精致学术排版');
+
+  // AI Configuration State
+  const [aiConfig, setAiConfig] = useState<AiConfig>({
+    baseUrl: 'https://api.openai.com/v1',
+    apiKey: '',
+    model: 'gpt-3.5-turbo'
+  });
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
 
   const handleStyleChange = (style: DigitalStyleId) => {
     setDigitalStyle(style);
-    // Auto-switch defaults for better UX
     if (style === 'retro') {
       setDigitalHeader('ARTICLE');
       setDigitalSubHeader('Classical Aesthetic Collection');
@@ -104,17 +113,31 @@ $$
   const activeMarkdown = template === 'academic' ? academicMarkdown : digitalMarkdown;
   const setMarkdown = template === 'academic' ? setAcademicMarkdown : setDigitalMarkdown;
 
-  // Academic Data Parsing
   const paperData = useMemo(() => parseMarkdownToPaper(academicMarkdown), [academicMarkdown]);
 
-  // Digital Title Parsing (Independent of Academic Data)
   const derivedDigitalTitle = useMemo(() => {
     const match = digitalMarkdown.match(/^#\s+(.+)$/m);
     return match ? match[1].trim() : "无标题";
   }, [digitalMarkdown]);
 
-  // Final Digital Title: Override takes precedence, then derived from MD
   const displayDigitalTitle = digitalTitleOverride || derivedDigitalTitle;
+
+  const handleAiEnhance = async () => {
+    if (!aiConfig.apiKey) {
+      setIsAiModalOpen(true);
+      return;
+    }
+    
+    setIsEnhancing(true);
+    try {
+      const enhancedText = await enhanceTextWithAi(activeMarkdown, aiConfig);
+      setMarkdown(enhancedText);
+    } catch (error: any) {
+      alert(`AI formatting failed: ${error.message}`);
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden font-sans relative">
@@ -153,6 +176,41 @@ $$
             </div>
           </section>
 
+          {/* AI Magic Wand Section */}
+          <section className="bg-gradient-to-br from-violet-50 to-purple-50 p-3 rounded-lg border border-purple-100">
+             <div className="flex justify-between items-center mb-3">
+                <h2 className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">AI Layout Magic</h2>
+                <button 
+                  onClick={() => setIsAiModalOpen(true)}
+                  className="text-purple-400 hover:text-purple-600 transition-colors"
+                  title="Configure AI"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                </button>
+             </div>
+             <p className="text-[10px] text-slate-500 mb-3 leading-relaxed">
+               Automatically format messy text into structured Markdown.
+             </p>
+             <button 
+                onClick={handleAiEnhance}
+                disabled={isEnhancing}
+                className={`w-full p-2.5 text-white rounded-lg text-sm font-semibold shadow-sm transition-all flex items-center justify-center space-x-2
+                  ${isEnhancing ? 'bg-purple-300 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700 hover:shadow-md'}`}
+             >
+                {isEnhancing ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span>Formatting...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    <span>Auto-Format</span>
+                  </>
+                )}
+             </button>
+          </section>
+
           {template === 'digital' && (
             <section className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-4">
               <div>
@@ -175,7 +233,6 @@ $$
                         placeholder={derivedDigitalTitle}
                         className="w-full p-2 text-xs border border-slate-200 rounded outline-none focus:border-indigo-500 placeholder:text-slate-300" 
                       />
-                      <p className="text-[9px] text-slate-400">Leave empty to use Markdown H1 (# Title)</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
@@ -217,6 +274,74 @@ $$
           </section>
         </div>
       </aside>
+
+      {/* AI Configuration Modal */}
+      {isAiModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <span className="text-xl">🪄</span> AI Configuration
+              </h3>
+              <button onClick={() => setIsAiModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-slate-500 mb-4 bg-slate-50 p-3 rounded border border-slate-100">
+                Configure any OpenAI-compatible API provider (e.g., OpenAI, DeepSeek, Moonshot, OneAPI).
+              </p>
+              
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">API Endpoint (Base URL)</label>
+                <input 
+                  type="text" 
+                  value={aiConfig.baseUrl}
+                  onChange={(e) => setAiConfig({...aiConfig, baseUrl: e.target.value})}
+                  className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                  placeholder="https://api.openai.com/v1"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">API Key</label>
+                <input 
+                  type="password" 
+                  value={aiConfig.apiKey}
+                  onChange={(e) => setAiConfig({...aiConfig, apiKey: e.target.value})}
+                  className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all font-mono"
+                  placeholder="sk-..."
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">Model Name</label>
+                <input 
+                  type="text" 
+                  value={aiConfig.model}
+                  onChange={(e) => setAiConfig({...aiConfig, model: e.target.value})}
+                  className="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                  placeholder="gpt-3.5-turbo, deepseek-chat, etc."
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <button 
+                onClick={() => setIsAiModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => setIsAiModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-sm transition-all"
+              >
+                Save Configuration
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
         <header className="lg:hidden no-print h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 flex-shrink-0 z-40">
