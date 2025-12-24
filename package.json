@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://USERNAME.github.io/REPO-NAME",
+  "homepage": "https://coribattaglia1761997qdc-png.github.io/Layout-studio-Pro",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
